@@ -1,5 +1,13 @@
 # 更新记录与详细说明
 
+## v8.4.18 启动提速：内嵌模块字节码缓存
+- server.py 内嵌的约 50 万字节模块源码以前每次启动都要重新编译（exec 字符串没有 .pyc）：启动面板、核心启动前的 `--gen`、每条命令行都要付这笔开销。现在第一次编译后把字节码压缩存到安装目录的 `__pycache__/server-embedded.<解释器>.bin`（约 400KB），之后直接加载；实测导入时间约减半（0.21 秒 → 0.09 秒，路由器上节省更明显）
+- 缓存按解释器版本 + 内嵌源码校验和失效：在线更新、回滚、手动替换 server.py 后自动重新编译；缓存损坏、目录只读时照旧现编译，不影响功能；设置环境变量 `PANEL_NO_CODE_CACHE=1` 可关闭
+- 异常堆栈仍显示 `shunt/xxx.py` 的文件名和出错行
+- 测试：`tests/test_fd_limit.py` 读文件改用 with，不再报 ResourceWarning
+- 用真实内核验证：mihomo v1.19.15 `-t`、sing-box 1.14.4 `check` 均通过（ss / vmess / vless reality / trojan / hysteria2 / tuic 节点）
+- 新增测试 `tests/test_v8418.py`；`tests/test_v8417.py` 的版本断言移到新文件
+
 ## v8.4.17 接口入参校验：规则测试 / 订阅 / 节点等不再 500「内部错误」
 - 规则测试：目标只填了协议头（如 `http://`、`https:///path`）时，前端判断非空放行，后端清洗后为空抛 ValueError，接口回 500「内部错误」。现在回 400「请输入域名或 IP」（与广告拦截查询的处理一致）
 - `/api/subs`、`/api/nodes`、`/api/dnsquery`、`/api/backup/delete`：字段传了数字、列表等非字符串时直接调用 `.strip()` / `.splitlines()` 抛 AttributeError，回 500「内部错误」。现在统一按字符串处理，给出正常的错误提示；`/api/backup/restore`、`/api/health/unhide`、`/api/adblock/check` 一并加固

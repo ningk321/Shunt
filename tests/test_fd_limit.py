@@ -8,6 +8,12 @@ from unittest import mock
 from tests.helper import server  # 确保离线导入
 from shunt import notify, sb_config, sysopt
 
+
+def _read(p):
+    with open(p, encoding="utf-8") as f:
+        return f.read()
+
+
 __all__ = ["server"]
 
 
@@ -25,7 +31,7 @@ class TestConfdMigrate(unittest.TestCase):
         with open(self.old, "w") as f:
             f.write('# x\nrc_ulimit="-n 1048576"\n')
         self.assertTrue(self.run_mig())
-        self.assertIn('rc_ulimit="-n 1048576"', open(self.new).read())
+        self.assertIn('rc_ulimit="-n 1048576"', _read(self.new))
         self.assertFalse(self.run_mig())  # 第二次不重复写
 
     def test_keep_existing(self):
@@ -34,7 +40,7 @@ class TestConfdMigrate(unittest.TestCase):
         with open(self.new, "w") as f:
             f.write('rc_ulimit="-n 65536"\n')
         self.assertFalse(self.run_mig())
-        self.assertEqual(open(self.new).read(), 'rc_ulimit="-n 65536"\n')
+        self.assertEqual(_read(self.new), 'rc_ulimit="-n 65536"\n')
 
     def test_no_old(self):
         self.assertFalse(self.run_mig())
@@ -86,7 +92,7 @@ class TestHangDump(unittest.TestCase):
                     mock.patch.object(notify, "HANG_LOG", self.hang):
                 self.assertTrue(notify.core_hang_dump("控制接口无响应"))
             p.wait(timeout=5)  # SIGQUIT 已结束进程
-            s = open(self.hang, encoding="utf-8").read()
+            s = _read(self.hang)
             self.assertIn("line before hang", s)
             self.assertIn("控制接口无响应", s)
         finally:
