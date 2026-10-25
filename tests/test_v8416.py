@@ -11,25 +11,11 @@ from tests.helper import server
 assert server
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VER = "8.4.16"
 
 
 def read(*p):
     with open(os.path.join(ROOT, *p), encoding="utf-8") as f:
         return f.read()
-
-
-class VersionTest(unittest.TestCase):
-    def test_version(self):
-        import sys
-        self.assertEqual(sys.modules["shunt.base"].PANEL_VERSION, VER)
-
-    def test_changelog_top(self):
-        heads = [ln for ln in read("CHANGELOG.md").splitlines() if ln.startswith("## v")]
-        self.assertTrue(heads[0].startswith("## v" + VER), heads[0])
-
-    def test_built(self):
-        self.assertIn(f'PANEL_VERSION = "{VER}"', read("server.py"))
 
 
 class DockerfileTest(unittest.TestCase):
@@ -141,7 +127,7 @@ class EntrypointTest(unittest.TestCase):
         self.assertEqual(read("server.py").count('\nPANEL_VERSION = "'), 2)
         out = subprocess.run("sed -n 's/^PANEL_VERSION = \"\\(.*\\)\"/\\1/p' server.py | head -n 1", shell=True, cwd=ROOT,
                              capture_output=True, text=True).stdout
-        self.assertEqual(out, VER + "\n")
+        self.assertEqual(out, server.PANEL_VERSION + "\n")
 
     def test_seed_does_not_overwrite(self):
         self.assertIn('[ -s "/data/mihomo/$f" ] ||', self.s)

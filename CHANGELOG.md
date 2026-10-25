@@ -1,5 +1,10 @@
 # 更新记录与详细说明
 
+## v8.4.17 接口入参校验：规则测试 / 订阅 / 节点等不再 500「内部错误」
+- 规则测试：目标只填了协议头（如 `http://`、`https:///path`）时，前端判断非空放行，后端清洗后为空抛 ValueError，接口回 500「内部错误」。现在回 400「请输入域名或 IP」（与广告拦截查询的处理一致）
+- `/api/subs`、`/api/nodes`、`/api/dnsquery`、`/api/backup/delete`：字段传了数字、列表等非字符串时直接调用 `.strip()` / `.splitlines()` 抛 AttributeError，回 500「内部错误」。现在统一按字符串处理，给出正常的错误提示；`/api/backup/restore`、`/api/health/unhide`、`/api/adblock/check` 一并加固
+- 新增测试 `tests/test_v8417.py`；`tests/test_v8416.py` 的版本断言移到新文件
+
 ## v8.4.16 Docker 镜像（amd64 / arm64），推送到 Docker Hub 和 GHCR
 - 新增 Docker 镜像：`skycn2022/shunt`（Docker Hub）、`ghcr.io/skycnhe/shunt`（GHCR），`linux/amd64` + `linux/arm64`，标签 `latest`、`hk001`、`v<面板版本>`。基于 Alpine 3.24，内置面板、mihomo / mihomo Smart / sing-box 三个内核、geo 数据、LightGBM 模型和 sing-box 默认规则集，内容由离线安装包脚本 `.github/offline/build.sh` 准备（同一套下载和三内核自测，自测不过不出镜像）
 - 运行方式：`network_mode: host` + `NET_ADMIN`（建议加 `NET_RAW`）+ `/dev/net/tun`，数据卷 `/data`（面板设置、mihomo / sing-box 配置与数据都在里面，`/etc/mihomo-panel`、`/etc/mihomo`、`/etc/sing-box` 是指向它的软链接）。宿主机要加载 `nft_tproxy` / `tun` 模块并开启 `ip_forward`；Docker 把 FORWARD 默认策略改成 DROP 时要放行局域网网卡转发。README 新增「Docker」一节，含 docker run / docker-compose 示例和宿主机准备

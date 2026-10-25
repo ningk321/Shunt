@@ -1,10 +1,32 @@
-"""接口入参类型回归测试：字段传了数字 / 列表等非字符串，或规则测试目标清洗后为空时，应给出原因，不再是未处理异常的 500「内部错误」"""
+"""v8.4.17：接口入参类型回归测试：字段传了数字 / 列表等非字符串，或规则测试目标清洗后为空时，应给出原因，不再是未处理异常的 500「内部错误」"""
+import os
+import sys
 import unittest
 
 from tests.helper import server
 from tests.test_v1012 import ApiCase
 
 assert server
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+VER = "8.4.17"
+
+
+def read(*p):
+    with open(os.path.join(ROOT, *p), encoding="utf-8") as f:
+        return f.read()
+
+
+class VersionTest(unittest.TestCase):
+    def test_version(self):
+        self.assertEqual(sys.modules["shunt.base"].PANEL_VERSION, VER)
+
+    def test_changelog_top(self):
+        heads = [ln for ln in read("CHANGELOG.md").splitlines() if ln.startswith("## v")]
+        self.assertTrue(heads[0].startswith("## v" + VER), heads[0])
+
+    def test_built(self):
+        self.assertIn(f'PANEL_VERSION = "{VER}"', read("server.py"))
 
 
 class RuleTestEmptyTargetTest(ApiCase):
