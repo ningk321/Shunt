@@ -11166,11 +11166,14 @@ class H(BaseHTTPRequestHandler):
 
     @api_route("/api/ruletest", "POST")
     def api_ruletest_post(self, m, p, b, q):
-        return self.send(200, rule_test(b.get("target") or ""))
+        try:
+            return self.send(200, rule_test(str(b.get("target") or "")))
+        except ValueError as e:  # 空目标（如只填了 http://）：给出原因，不再 500「内部错误」
+            return self.send(400, {"message": str(e)})
 
     @api_route("/api/subs", "POST")
     def api_subs_post(self, m, p, b, q):
-        name, url = (b.get("name") or "").strip(), (b.get("url") or "").strip()
+        name, url = str(b.get("name") or "").strip(), str(b.get("url") or "").strip()
         cur = next((s for s in load()["subs"] if isinstance(s, dict) and s.get("name") == name), None)
         if cur:  # 编辑订阅时表单里是打码后的 URL：没改就沿用原链接
             url = unmask(url, cur.get("url"), mask_url)
@@ -11179,7 +11182,7 @@ class H(BaseHTTPRequestHandler):
         other = sub_name_clash(name, [s.get("name") for s in load()["subs"] if isinstance(s, dict) and s.get("name")])
         if other:  # 「机场 A」和「机场_A」会共用 ./providers/<名>.yaml 和 sing-box 节点缓存，互相覆盖
             return self.send(400, {"message": f"与已有订阅「{other}」只差符号，会共用同一个缓存文件，请改个名字"})
-        flt, exc = (b.get("filter") or "").strip(), (b["exclude"] if "exclude" in b else DEFAULT_EXCLUDE).strip()
+        flt, exc = str(b.get("filter") or "").strip(), str(b["exclude"] if "exclude" in b else DEFAULT_EXCLUDE).strip()
         for pat in (flt, exc):
             try:
                 re.compile(pat)
@@ -11303,7 +11306,7 @@ class H(BaseHTTPRequestHandler):
     @api_route("/api/nodes", "POST")
     def api_nodes_post(self, m, p, b, q):
         d = load()
-        added, errs = add_links(b.get("links") or "", d["nodes"], d)
+        added, errs = add_links(str(b.get("links") or ""), d["nodes"], d)
         if not added:
             return self.send(400, {"message": "没有可导入的节点" + ("：\\n" + "\\n".join(errs) if errs else "")})
         prev = update(lambda d: d["nodes"].extend(added))
@@ -11421,7 +11424,7 @@ class H(BaseHTTPRequestHandler):
     @api_route("/api/adblock/check", "POST")
     def api_adblock_check_post(self, m, p, b, q):
         try:
-            return self.send(200, ab_check(b.get("domain") or ""))
+            return self.send(200, ab_check(str(b.get("domain") or "")))
         except ValueError as e:  # 无效域名：给出原因，不再 500「内部错误」
             return self.send(400, {"message": str(e)})
 
@@ -11458,8 +11461,8 @@ class H(BaseHTTPRequestHandler):
 
     @api_route("/api/dnsquery", "POST")
     def api_dnsquery_post(self, m, p, b, q):
-        name = clean_target(b.get("name") or "")
-        qtype = (b.get("type") or "A").upper()
+        name = clean_target(str(b.get("name") or ""))
+        qtype = str(b.get("type") or "A").upper()
         if not name or qtype not in ("A", "AAAA", "CNAME", "MX", "TXT", "NS", "HTTPS", "SRV", "PTR"):
             return self.send(400, {"message": "请输入域名并选择记录类型"})
         st = time.time()
@@ -11675,7 +11678,7 @@ class H(BaseHTTPRequestHandler):
                 d.update(keep)
             st["prev"] = update(fn)
 
-        ok, msg = backup_mod.restore((b.get("name") or "").strip(), check_data=check, apply_data=apply)
+        ok, msg = backup_mod.restore(str(b.get("name") or "").strip(), check_data=check, apply_data=apply)
         restored = ok  # 程序文件（server.py / index.html）已换成备份里的版本
         if ok and "prev" in st:
             note = sub_refetch(sub_caches_sync(st["prev"], load()))
@@ -11698,7 +11701,7 @@ class H(BaseHTTPRequestHandler):
     @api_route("/api/backup/delete", "POST")
     def api_backup_delete(self, m, p, b, q):
         from . import backup as backup_mod
-        ok, msg = backup_mod.delete((b.get("name") or "").strip())
+        ok, msg = backup_mod.delete(str(b.get("name") or "").strip())
         return self.reply(ok, msg)
 
     @api_route("/api/health/status", "GET")
@@ -11720,7 +11723,7 @@ class H(BaseHTTPRequestHandler):
     @api_route("/api/health/unhide", "POST")
     def api_health_unhide(self, m, p, b, q):
         from . import health as health_mod
-        name = (b.get("node_id") or "").strip()
+        name = str(b.get("node_id") or "").strip()
         ok = health_mod.unhide(name) if name else False
         return self.reply(ok, "已取消隐藏" if ok else "节点不存在")
 
