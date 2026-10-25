@@ -4,7 +4,7 @@
 
 本文件由 tools/build.py 生成，内嵌了 shunt/ 目录下全部模块的源码。请修改 shunt/ 下的文件后重新生成，不要直接改这里。
 """
-PANEL_VERSION = "8.4.18"
+PANEL_VERSION = "8.4.19"
 import importlib.abc, importlib.util, linecache, marshal, os, sys, types, zlib
 
 _SRC = {}
@@ -338,7 +338,7 @@ LEGACY_AUTO = "♻️ 自动选择"  # v5 及以前的名称，读取旧数据�
 AUTO_ORDER = ["日本", "新加坡", "香港", "美国"]  # 「自动优选」组在节点选择中的顺序，其余地区按识别顺序排在后面
 LB_ORDER = ["香港", "日本", "新加坡", "美国"]    # 「负载均衡」组的顺序
 SCHEMA = 9
-PANEL_VERSION = "8.4.18"
+PANEL_VERSION = "8.4.19"
 L, R = "(?<![A-Za-z])", "(?![A-Za-z])"  # 英文缩写两侧不能紧挨字母，避免 (?i)US 误匹配 Russia / Plus / Australia
 REGIONS = [  # (分组名, 正则)；正则同时在 Python 与 mihomo(regexp2) 中使用，只用两者都支持的语法
     ("🇭🇰 香港", f"🇭🇰|(?i:香港|港|Hong ?Kong)|{L}HKG?{R}"),
@@ -7838,6 +7838,11 @@ def norm_domain(s):
     return s
 
 
+# 元素隐藏 / 脚本注入规则（example.com##.ad、#@#、#?#、#$#、#%#）：只作用于页面元素，不能当成整站拦截
+COSMETIC_RX = re.compile(r"#[@$?%]{0,3}#")
+AB_PARSER = 2  # 解析器版本：变了就让已下载的列表尽快按新规则重新转换（见 schedule.ab_last_update）
+
+
 def parse_filter(text, plain_suffix=False):
     """解析过滤列表文本。返回 (block_suffix, block_exact, allow_suffix, allow_exact, skipped)"""
     bs, be, as_, ae = set(), set(), set(), set()
@@ -7848,6 +7853,9 @@ def parse_filter(text, plain_suffix=False):
             continue
         low = line.lower()
         if low.startswith("payload:"):
+            continue
+        if COSMETIC_RX.search(low):  # 以前按 # 截断后把「baike.baidu.com##.ad」当成拦截整个 baike.baidu.com
+            skipped += 1
             continue
         if low.startswith("- "):  # Clash YAML payload：  - DOMAIN-SUFFIX,a.com / - '+.a.com'
             low = low[2:].strip().strip("'\\"")
@@ -7969,7 +7977,7 @@ def ab_fetch(lst, late=None):
         raise IOError("下载超时")
     write_lines(os.path.join(AB_DIR, lst["id"] + ".txt"), lines)
     write_lines(os.path.join(AB_DIR, lst["id"] + ".allow.txt"), alines)
-    return {"count": n, "allow": na, "skipped": skipped, "updated": int(time.time()), "error": ""}
+    return {"count": n, "allow": na, "skipped": skipped, "updated": int(time.time()), "error": "", "parser": AB_PARSER}
 
 
 def ab_compose(d):
@@ -8542,7 +8550,7 @@ from .sb_config import sb_sync_assets
 from .sysopt import svc_restart
 from .notify import WD
 from .latency import bg_fetch, bg_meta, bg_meta_save
-from .adblock import AB_STATE, ab_meta, adblock_update
+from .adblock import AB_PARSER, AB_STATE, ab_meta, adblock_update
 from .health import health_cfg, run_check as health_run_check
 SCHED = {"events": deque(maxlen=30), "done": {}}
 # 每天定点任务的最近执行记录 {任务: {"date": 日期, "at": 当时的设定时刻}}，落盘到 sched_done.json：
@@ -8750,7 +8758,9 @@ def sched_loop():
 
 def ab_last_update():
     m = ab_meta()
-    return max([v.get("updated", 0) for v in m.values()] or [0])
+    if any(isinstance(v, dict) and v.get("updated") and not v.get("error") and int(v.get("parser") or 1) < AB_PARSER for v in m.values()):
+        return 0  # 旧解析器转换的列表（可能误拦整站）：当作从未更新，定时任务会尽快重新下载
+    return max([v.get("updated", 0) for v in m.values() if isinstance(v, dict)] or [0])
 '''
 _SRC['shunt.devices'] = '''"""设备名称"""
 import ipaddress, os, re, socket, threading, time

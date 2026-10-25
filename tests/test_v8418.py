@@ -11,7 +11,7 @@ from tests.helper import server
 assert server
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VER = "8.4.18"
+VER = sys.modules["shunt.base"].PANEL_VERSION  # 版本断言在 tests/test_v8419.py
 TAG = sys.implementation.cache_tag
 
 
@@ -20,19 +20,6 @@ def read(*p):
         return f.read()
 
 
-class VersionTest(unittest.TestCase):
-    def test_version(self):
-        self.assertEqual(sys.modules["shunt.base"].PANEL_VERSION, VER)
-
-    def test_changelog_top(self):
-        heads = [ln for ln in read("CHANGELOG.md").splitlines() if ln.startswith("## v")]
-        self.assertTrue(heads[0].startswith("## v" + VER), heads[0])
-
-    def test_built(self):
-        self.assertIn(f'PANEL_VERSION = "{VER}"', read("server.py"))
-
-
-@unittest.skipUnless(TAG, "解释器没有 cache_tag")
 class CodeCacheTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="shunt-cc-")

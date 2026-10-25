@@ -16,7 +16,7 @@ from .sb_config import sb_sync_assets
 from .sysopt import svc_restart
 from .notify import WD
 from .latency import bg_fetch, bg_meta, bg_meta_save
-from .adblock import AB_STATE, ab_meta, adblock_update
+from .adblock import AB_PARSER, AB_STATE, ab_meta, adblock_update
 from .health import health_cfg, run_check as health_run_check
 SCHED = {"events": deque(maxlen=30), "done": {}}
 # 每天定点任务的最近执行记录 {任务: {"date": 日期, "at": 当时的设定时刻}}，落盘到 sched_done.json：
@@ -224,4 +224,6 @@ def sched_loop():
 
 def ab_last_update():
     m = ab_meta()
-    return max([v.get("updated", 0) for v in m.values()] or [0])
+    if any(isinstance(v, dict) and v.get("updated") and not v.get("error") and int(v.get("parser") or 1) < AB_PARSER for v in m.values()):
+        return 0  # 旧解析器转换的列表（可能误拦整站）：当作从未更新，定时任务会尽快重新下载
+    return max([v.get("updated", 0) for v in m.values() if isinstance(v, dict)] or [0])

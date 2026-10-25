@@ -46,6 +46,11 @@ def norm_domain(s):
     return s
 
 
+# 元素隐藏 / 脚本注入规则（example.com##.ad、#@#、#?#、#$#、#%#）：只作用于页面元素，不能当成整站拦截
+COSMETIC_RX = re.compile(r"#[@$?%]{0,3}#")
+AB_PARSER = 2  # 解析器版本：变了就让已下载的列表尽快按新规则重新转换（见 schedule.ab_last_update）
+
+
 def parse_filter(text, plain_suffix=False):
     """解析过滤列表文本。返回 (block_suffix, block_exact, allow_suffix, allow_exact, skipped)"""
     bs, be, as_, ae = set(), set(), set(), set()
@@ -56,6 +61,9 @@ def parse_filter(text, plain_suffix=False):
             continue
         low = line.lower()
         if low.startswith("payload:"):
+            continue
+        if COSMETIC_RX.search(low):  # 以前按 # 截断后把「baike.baidu.com##.ad」当成拦截整个 baike.baidu.com
+            skipped += 1
             continue
         if low.startswith("- "):  # Clash YAML payload：  - DOMAIN-SUFFIX,a.com / - '+.a.com'
             low = low[2:].strip().strip("'\"")
@@ -177,7 +185,7 @@ def ab_fetch(lst, late=None):
         raise IOError("下载超时")
     write_lines(os.path.join(AB_DIR, lst["id"] + ".txt"), lines)
     write_lines(os.path.join(AB_DIR, lst["id"] + ".allow.txt"), alines)
-    return {"count": n, "allow": na, "skipped": skipped, "updated": int(time.time()), "error": ""}
+    return {"count": n, "allow": na, "skipped": skipped, "updated": int(time.time()), "error": "", "parser": AB_PARSER}
 
 
 def ab_compose(d):
